@@ -1,5 +1,4 @@
 import { Suspense } from 'react';
-import { AgentUI } from '../components/agent-ui';
 import { WorkflowForm } from '../components/workflow-form';
 import { Header } from '../components/header';
 

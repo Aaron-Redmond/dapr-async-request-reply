@@ -1,6 +1,5 @@
 import { IconBrandGithub } from "@tabler/icons-react";
 import { WorkflowIcon } from "../icons/workflow-icon";
-import DeployButton from "./deploy-button";
 
 export const Header = () => {
     return (
@@ -21,9 +20,6 @@ export const Header = () => {
               <IconBrandGithub size={18} />
               Repository
             </a>
-            <div className="h-8 w-[103px]">
-              <DeployButton />
-            </div>
           </div>
         </div>
       </header>

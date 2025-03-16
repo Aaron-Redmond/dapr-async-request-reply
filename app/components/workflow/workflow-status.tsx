@@ -74,7 +74,6 @@ export const WorkflowStatus = ({ workflowId, isSubmitting }: WorkflowStatusProps
       
       eventSource.onmessage = (event) => {
         setLoading(false);
-        isSubmitting = false;
         const data = JSON.parse(event.data);
         setWorkflowStatus(data);
 
