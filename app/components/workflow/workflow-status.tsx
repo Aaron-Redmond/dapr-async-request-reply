@@ -54,7 +54,9 @@ const resolveStepStatus = (workflowStatus: WorkflowStatus | null, index: number)
 
   return 'init';
 };
-    
+
+export { resolveStepStatus };
+
 interface WorkflowStatusProps {
   workflowId: string | null;
   isSubmitting: boolean;
