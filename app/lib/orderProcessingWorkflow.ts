@@ -104,8 +104,8 @@ export const orderProcessingWorkflow: TWorkflow = async function* (ctx: Workflow
   const orderId = ctx.getWorkflowInstanceId();
   
   const statusUpdates: StatusUpdate[] = [];
-  const addStatus = (stage: string, message: string, status: 'running' | 'completed' | 'failed') => {
-    const timestamp = new Date().toISOString();
+  const addStatus = (stage: string, wfDate: Date, message: string, status: 'running' | 'completed' | 'failed') => {
+    const timestamp = wfDate.toISOString();
     const existingStageIndex = statusUpdates.findIndex(s => s.stage === stage);
     
     if (existingStageIndex === -1) {
@@ -145,7 +145,7 @@ export const orderProcessingWorkflow: TWorkflow = async function* (ctx: Workflow
 
   // Initial status
   console.log(`Processing order ${orderId}...`);
-  addStatus('order_processing', 'Starting order processing...', 'running');
+  addStatus('order_processing', ctx.getCurrentUtcDateTime(), 'Starting order processing...', 'running');
 
   // Initial delay
   yield ctx.createTimer(5);
@@ -154,29 +154,29 @@ export const orderProcessingWorkflow: TWorkflow = async function* (ctx: Workflow
     message: `Received order ${orderId} for ${orderPayLoad.quantity} ${orderPayLoad.itemName} at a total cost of ${orderPayLoad.totalCost}`,
   };
   yield ctx.callActivity(notifyActivity, orderNotification);
-  addStatus('order_processing', `Order received: ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'completed');
+  addStatus('order_processing', ctx.getCurrentUtcDateTime(),`Order received: ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'completed');
 
 
   // Start inventory check
-  addStatus('inventory_check', 'Starting inventory verification...', 'running');
+  addStatus('inventory_check', ctx.getCurrentUtcDateTime(),'Starting inventory verification...', 'running');
   const inventoryRequest = new InventoryRequest(orderId, orderPayLoad.itemName, orderPayLoad.quantity);
-  addStatus('inventory_check', `Checking inventory for ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'running');
+  addStatus('inventory_check',ctx.getCurrentUtcDateTime(), `Checking inventory for ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'running');
   const inventoryResult = yield ctx.callActivity(verifyInventoryActivity, inventoryRequest);
 
   if (!inventoryResult.success) {
-    addStatus('inventory_check', `Insufficient inventory for order ${orderId}`, 'failed');
+    addStatus('inventory_check',ctx.getCurrentUtcDateTime(), `Insufficient inventory for order ${orderId}`, 'failed');
     const orderNotification: OrderNotification = {
       message: `Insufficient inventory for order ${orderId}`,
     };
     yield ctx.callActivity(notifyActivity, orderNotification);
     return new OrderResult(false);
   }
-  addStatus('inventory_check', 'Inventory verification completed successfully', 'completed');
+  addStatus('inventory_check',ctx.getCurrentUtcDateTime(), 'Inventory verification completed successfully', 'completed');
 
 
   if (orderPayLoad.totalCost > 5000) {
-    addStatus('approval', 'Starting approval process...', 'running');
-    addStatus('approval', `Requesting approval for order total: $${orderPayLoad.totalCost}`, 'running');
+    addStatus('approval', ctx.getCurrentUtcDateTime(),'Starting approval process...', 'running');
+    addStatus('approval', ctx.getCurrentUtcDateTime(), `Requesting approval for order total: $${orderPayLoad.totalCost}`, 'running');
     yield ctx.callActivity(requestApprovalActivity, orderPayLoad);
     
     ctx.createTimer(5);
@@ -188,67 +188,67 @@ export const orderProcessingWorkflow: TWorkflow = async function* (ctx: Workflow
     const winner = ctx.whenAny(tasks);
 
     if (winner == timeOutEvent) {
-      addStatus('approval', 'Approval process timed out', 'failed');
+      addStatus('approval', ctx.getCurrentUtcDateTime(),'Approval process timed out', 'failed');
       const orderNotification: OrderNotification = {
         message: `Order ${orderId} has been cancelled due to approval timeout.`,
       };
       yield ctx.callActivity(notifyActivity, orderNotification);
-      addStatus('approval', 'Order failed due to approval timeout', 'failed');
+      addStatus('approval', ctx.getCurrentUtcDateTime(),'Order failed due to approval timeout', 'failed');
       return new OrderResult(false);
     }
     const approvalResult = approvalEvent.getResult();
     if (!approvalResult) {
-      addStatus('approval', 'Order was not approved', 'failed');
+      addStatus('approval', ctx.getCurrentUtcDateTime(),'Order was not approved', 'failed');
       const orderNotification: OrderNotification = {
         message: `Order ${orderId} was not approved.`,
       };
       yield ctx.callActivity(notifyActivity, orderNotification);
-      addStatus('approval', 'Order failed due to approval rejection', 'failed');
+      addStatus('approval', ctx.getCurrentUtcDateTime(),'Order failed due to approval rejection', 'failed');
       return new OrderResult(false);
     }
-    addStatus('approval', 'Order approved successfully', 'completed');
+    addStatus('approval', ctx.getCurrentUtcDateTime(),'Order approved successfully', 'completed');
   }
 
   // Delay before payment processing
  
   
   // Start payment processing
-  addStatus('payment', 'Starting payment processing...', 'running');
+  addStatus('payment', ctx.getCurrentUtcDateTime(),'Starting payment processing...', 'running');
   yield ctx.createTimer(5);
-  addStatus('payment', `Processing payment of $${orderPayLoad.totalCost}`, 'running');
+  addStatus('payment', ctx.getCurrentUtcDateTime(), `Processing payment of $${orderPayLoad.totalCost}`, 'running');
   const orderPaymentRequest = new OrderPaymentRequest(orderId, orderPayLoad.itemName, orderPayLoad.totalCost, orderPayLoad.quantity);
   const paymentResult = yield ctx.callActivity(processPaymentActivity, orderPaymentRequest);
 
   if (!paymentResult) {
-    addStatus('payment', 'Payment processing failed', 'failed');
+    addStatus('payment', ctx.getCurrentUtcDateTime(), 'Payment processing failed', 'failed');
     const orderNotification: OrderNotification = {
       message: `Payment for order ${orderId} failed`,
     };
     yield ctx.callActivity(notifyActivity, orderNotification);
-    addStatus('payment', 'Order failed due to payment failure', 'failed');
+    addStatus('payment', ctx.getCurrentUtcDateTime(), 'Order failed due to payment failure', 'failed');
     return new OrderResult(false);
   }
-  addStatus('payment', 'Payment processed successfully', 'completed');
+  addStatus('payment', ctx.getCurrentUtcDateTime(), 'Payment processed successfully', 'completed');
 
   // Delay before inventory update
 
   
   // Start inventory update
-  addStatus('inventory_update', 'Starting inventory update...', 'running');
+  addStatus('inventory_update', ctx.getCurrentUtcDateTime(), 'Starting inventory update...', 'running');
   yield ctx.createTimer(5);
-  addStatus('inventory_update', `Updating inventory for ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'running');
+  addStatus('inventory_update', ctx.getCurrentUtcDateTime(), `Updating inventory for ${orderPayLoad.quantity} ${orderPayLoad.itemName}`, 'running');
   const updatedResult = yield ctx.callActivity(updateInventoryActivity, inventoryRequest);
   
   if (!updatedResult.success) {
-    addStatus('inventory_update', 'Failed to update inventory', 'failed');
+    addStatus('inventory_update', ctx.getCurrentUtcDateTime(), 'Failed to update inventory', 'failed');
     const orderNotification: OrderNotification = {
       message: `Failed to update inventory for order ${orderId}`,
     };
     yield ctx.callActivity(notifyActivity, orderNotification);
-    addStatus('inventory_update', 'Order failed due to inventory update failure', 'failed');
+    addStatus('inventory_update', ctx.getCurrentUtcDateTime(), 'Order failed due to inventory update failure', 'failed');
     return new OrderResult(false);
   }
-  addStatus('inventory_update', 'Inventory updated successfully', 'completed');
+  addStatus('inventory_update', ctx.getCurrentUtcDateTime(),  'Inventory updated successfully', 'completed');
 
   const orderCompletedNotification: OrderNotification = {
     message: `order ${orderId} processed successfully!`,
@@ -256,6 +256,5 @@ export const orderProcessingWorkflow: TWorkflow = async function* (ctx: Workflow
   yield ctx.callActivity(notifyActivity, orderCompletedNotification);
 
   console.log(`Order ${orderId} processed successfully!`);
-  addStatus('order_processing', 'Order completed successfully', 'completed');
   return new OrderResult(true);
 }
