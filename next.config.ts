@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     nodeMiddleware: true,
   },
-  serverExternalPackages: ["@dapr/dapr"]
+  serverExternalPackages: ["@dapr/dapr"],
+  output: 'standalone', // Generates a standalone build
 };
 
 export default nextConfig;
